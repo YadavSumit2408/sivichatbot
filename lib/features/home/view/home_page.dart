@@ -4,45 +4,8 @@ import '../cubit/home_cubit.dart';
 import '../../users/view/users_page.dart';
 import '../../chat/view/chat_history_page.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  final ScrollController _scrollController = ScrollController();
-  bool _showAppBar = true;
-  double _lastScrollOffset = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
-
-  void _onScroll() {
-    final currentOffset = _scrollController.offset;
-
-    if (currentOffset > _lastScrollOffset && currentOffset > 50) {
-      if (_showAppBar) {
-        setState(() => _showAppBar = false);
-      }
-    } else if (currentOffset < _lastScrollOffset) {
-      if (!_showAppBar) {
-        setState(() => _showAppBar = true);
-      }
-    }
-
-    _lastScrollOffset = currentOffset;
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,25 +14,21 @@ class _HomePageState extends State<HomePage> {
         return Scaffold(
           backgroundColor: const Color(0xFFF4F5F7),
           body: NestedScrollView(
-            controller: _scrollController,
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
                 SliverAppBar(
                   floating: true,
                   snap: true,
                   pinned: false,
+                  centerTitle: true,
                   backgroundColor: Colors.white,
                   elevation: 0,
                   toolbarHeight: 70,
-                  title: AnimatedOpacity(
-                    opacity: _showAppBar ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 200),
-                    child: _AppBarSwitcher(
-                      selectedIndex: selectedTab,
-                      onTabChanged: (index) {
-                        context.read<HomeCubit>().changeTab(index);
-                      },
-                    ),
+                  title: _AppBarSwitcher(
+                    selectedIndex: selectedTab,
+                    onTabChanged: (index) {
+                      context.read<HomeCubit>().changeTab(index);
+                    },
                   ),
                   bottom: PreferredSize(
                     preferredSize: const Size.fromHeight(1),
@@ -115,7 +74,7 @@ class _AppBarSwitcher extends StatelessWidget {
       height: 44,
       decoration: BoxDecoration(
         color: const Color(0xFFF4F5F7),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(32),
       ),
       padding: const EdgeInsets.all(4),
       child: Row(
@@ -154,11 +113,11 @@ class _SwitcherTab extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 50),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(32),
           boxShadow: isSelected
               ? [
                   BoxShadow(
@@ -181,4 +140,3 @@ class _SwitcherTab extends StatelessWidget {
     );
   }
 }
-

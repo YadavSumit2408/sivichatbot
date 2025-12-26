@@ -2,22 +2,62 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../users/cubit/users_cubit.dart';
 import '../../users/cubit/users_state.dart';
+import '../../users/model/user_model.dart';
 import '../cubit/chat_cubit.dart';
+import '../model/message_model.dart';
 import '../view/chat_page.dart';
 
-class ChatHistoryPage extends StatelessWidget {
-  const ChatHistoryPage({super.key});
+class ChatHistoryPage extends StatefulWidget {
+  final ScrollController? scrollController;
+  
+  const ChatHistoryPage({super.key, this.scrollController});
+
+  @override
+  State<ChatHistoryPage> createState() => _ChatHistoryPageState();
+}
+
+class _ChatHistoryPageState extends State<ChatHistoryPage> {
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = widget.scrollController ?? ScrollController();
+  }
+
+  @override
+  void dispose() {
+    if (widget.scrollController == null) {
+      _scrollController.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<UsersCubit, UsersState>(
       builder: (context, usersState) {
-        final usersWithChats = usersState.users.where((user) {
+        // Get users with their last messages
+        final List<Map<String, dynamic>> usersWithChatsData = [];
+        
+        for (var user in usersState.users) {
           final lastMessage = context.read<ChatCubit>().getLastMessageForUser(user.id);
-          return lastMessage != null;
-        }).toList();
+          if (lastMessage != null) {
+            usersWithChatsData.add({
+              'user': user,
+              'lastMessage': lastMessage,
+            });
+          }
+        }
 
-        if (usersWithChats.isEmpty) {
+        // Sort by most recent message first
+        usersWithChatsData.sort((a, b) {
+          final MessageModel aMessage = a['lastMessage'] as MessageModel;
+          final MessageModel bMessage = b['lastMessage'] as MessageModel;
+          return bMessage.timestamp.compareTo(aMessage.timestamp);
+        });
+
+        if (usersWithChatsData.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -50,16 +90,18 @@ class ChatHistoryPage extends StatelessWidget {
         }
 
         return ListView.separated(
+          controller: _scrollController,
           key: const PageStorageKey('chat_history'),
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: usersWithChats.length,
+          itemCount: usersWithChatsData.length,
           separatorBuilder: (_, __) => Divider(
             height: 1,
             color: Colors.grey.shade200,
           ),
           itemBuilder: (context, index) {
-            final user = usersWithChats[index];
-            final lastMessage = context.read<ChatCubit>().getLastMessageForUser(user.id);
+            final data = usersWithChatsData[index];
+            final UserModel user = data['user'] as UserModel;
+            final MessageModel lastMessage = data['lastMessage'] as MessageModel;
 
             return Container(
               color: Colors.white,
@@ -87,29 +129,25 @@ class ChatHistoryPage extends StatelessWidget {
                     fontSize: 16,
                   ),
                 ),
-                subtitle: lastMessage != null
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          lastMessage.text,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      )
-                    : null,
-                trailing: lastMessage != null
-                    ? Text(
-                        _formatTime(lastMessage.timestamp),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
-                        ),
-                      )
-                    : null,
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    lastMessage.text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                trailing: Text(
+                  _formatTime(lastMessage.timestamp),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
                 onTap: () {
                   Navigator.push(
                     context,

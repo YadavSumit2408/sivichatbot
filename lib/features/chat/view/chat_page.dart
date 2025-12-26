@@ -18,7 +18,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    // Load messages immediately when page opens
+    // Loads messages immediately when page opens
     context.read<ChatCubit>().loadMessagesForUser(widget.user.id);
   }
 
@@ -326,11 +326,11 @@ class _MessageBubble extends StatelessWidget {
             ),
             if (isSender) ...[
               const SizedBox(width: 8),
-              const CircleAvatar(
+               CircleAvatar(
                 radius: 16,
                 backgroundColor: Colors.blue,
                 child: Text(
-                  'Y',
+                  user.initial,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,

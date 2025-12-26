@@ -7,18 +7,28 @@ import '../../chat/view/chat_page.dart';
 import '../../chat/cubit/chat_cubit.dart';
 
 class UsersPage extends StatefulWidget {
-  const UsersPage({super.key});
+  final ScrollController? scrollController;
+  
+  const UsersPage({super.key, this.scrollController});
 
   @override
   State<UsersPage> createState() => _UsersPageState();
 }
 
 class _UsersPageState extends State<UsersPage> {
-  final ScrollController _scrollController = ScrollController();
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = widget.scrollController ?? ScrollController();
+  }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    if (widget.scrollController == null) {
+      _scrollController.dispose();
+    }
     super.dispose();
   }
 
