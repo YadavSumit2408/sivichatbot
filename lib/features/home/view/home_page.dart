@@ -16,32 +16,34 @@ class HomePage extends StatelessWidget {
         final selectedTab = state.selectedTabIndex;
 
         return Scaffold(
-          body: NestedScrollView(
-            headerSliverBuilder: (_, __) {
-              return [
+            body: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(32),
+            ),
+            child: NestedScrollView(
+              headerSliverBuilder: (_, __) => [
                 SliverAppBar(
+                  backgroundColor: Colors.white,
+                  elevation: 0,
                   floating: true,
                   snap: true,
                   centerTitle: true,
-                  title: _TopTabSwitcher(
-                    selectedTab: selectedTab,
-                  ),
-                ),
-              ];
-            },
-            body: IndexedStack(
-              index: selectedTab,
-              children: [
-                UsersPage(
-                  key: const PageStorageKey('users'),
-                ),
-                ChatHistoryPage(
-                  key: const PageStorageKey('history'),
+                  title: _TopTabSwitcher(selectedTab: selectedTab),
                 ),
               ],
+              body: IndexedStack(
+                index: selectedTab,
+                children: const [
+                  UsersPage(key: PageStorageKey('users')),
+                  ChatHistoryPage(key: PageStorageKey('history')),
+                ],
+              ),
             ),
           ),
-        );
+        ));
       },
     );
   }
@@ -60,7 +62,7 @@ class _TopTabSwitcher extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(32),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -104,13 +106,14 @@ class _TabButton extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(32),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontWeight: FontWeight.w600,
             color: isSelected ? Colors.black : Colors.grey,
+            fontSize: 14
           ),
         ),
       ),

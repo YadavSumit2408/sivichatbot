@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'app_providers.dart';
 import 'features/home/view/home_page.dart';
+import 'main_page.dart';
 
 void main() {
   runApp(const MySiviChatApp());
@@ -21,7 +22,7 @@ class MySiviChatApp extends StatelessWidget {
         theme: ThemeData(
           useMaterial3: true,
         ),
-        home: const HomePage(),
+        home: const MainPage(),
       ),
     );
   }

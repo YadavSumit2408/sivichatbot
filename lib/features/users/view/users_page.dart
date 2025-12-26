@@ -50,6 +50,7 @@ class _UserTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: CircleAvatar(
+        backgroundColor: Colors.lightGreen,
         child: Text(user.initial),
       ),
       title: Text(user.name),
