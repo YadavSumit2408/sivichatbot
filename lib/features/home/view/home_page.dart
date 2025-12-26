@@ -1,45 +1,58 @@
-// lib/features/home/view/home_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../cubit/home_cubit.dart';
 import '../cubit/home_state.dart';
+import '../../users/view/users_page.dart';
+import '../../chat/view/chat_history_page.dart';
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<HomeCubit, HomeState>(
-  builder: (context, state) {
-    final selectedTab = state.selectedTabIndex;
+      builder: (context, state) {
+        final selectedTab = state.selectedTabIndex;
 
-    return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (_, __) => [
-          SliverAppBar(
-            floating: true,
-            snap: true,
-            centerTitle: true,
-            title: _TopTabSwitcher(selectedTab: selectedTab),
+        return Scaffold(
+          body: NestedScrollView(
+            headerSliverBuilder: (_, __) {
+              return [
+                SliverAppBar(
+                  floating: true,
+                  snap: true,
+                  centerTitle: true,
+                  title: _TopTabSwitcher(
+                    selectedTab: selectedTab,
+                  ),
+                ),
+              ];
+            },
+            body: IndexedStack(
+              index: selectedTab,
+              children: [
+                UsersPage(
+                  key: const PageStorageKey('users'),
+                ),
+                ChatHistoryPage(
+                  key: const PageStorageKey('history'),
+                ),
+              ],
+            ),
           ),
-        ],
-        body: IndexedStack(
-          index: selectedTab,
-          children: const [
-            UsersPage(key: PageStorageKey('users')),
-            ChatHistoryPage(key: PageStorageKey('history')),
-          ],
-        ),
-      ),
+        );
+      },
     );
-  },
-);
-
   }
 }
+
 class _TopTabSwitcher extends StatelessWidget {
   final int selectedTab;
 
-  const _TopTabSwitcher({required this.selectedTab});
+  const _TopTabSwitcher({
+    required this.selectedTab,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +80,7 @@ class _TopTabSwitcher extends StatelessWidget {
     );
   }
 }
+
 class _TabButton extends StatelessWidget {
   final String label;
   final bool isSelected;
@@ -84,7 +98,10 @@ class _TabButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 8,
+        ),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
