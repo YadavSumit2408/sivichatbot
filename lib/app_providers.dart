@@ -11,7 +11,7 @@ import 'features/chat/repository/chat_repository.dart';
 List<BlocProvider> buildBlocProviders() {
   final apiClient = ApiClient(
     client: http.Client(),
-    baseUrl: ApiConstants.quotableBaseUrl,
+    baseUrl: ApiConstants.jsonPlaceholderBaseUrl,
   );
 
   final chatRepository = ChatRepository(apiClient: apiClient);

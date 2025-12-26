@@ -18,9 +18,8 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ChatCubit>().loadMessagesForUser(widget.user.id);
-    });
+    // Load messages immediately when page opens
+    context.read<ChatCubit>().loadMessagesForUser(widget.user.id);
   }
 
   @override
@@ -92,13 +91,17 @@ class _MessagesList extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<ChatCubit, ChatState>(
       builder: (context, state) {
+        // Show loading only on first load
         if (state.isLoading && state.messages.isEmpty) {
           return const Center(
             child: CircularProgressIndicator(color: Colors.green),
           );
         }
 
-        if (state.messages.isEmpty) {
+        // Filter messages for current user
+        final userMessages = state.messages.where((msg) => msg.userId == user.id).toList();
+
+        if (userMessages.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -132,9 +135,9 @@ class _MessagesList extends StatelessWidget {
         return ListView.builder(
           reverse: true,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          itemCount: state.messages.length,
+          itemCount: userMessages.length,
           itemBuilder: (context, index) {
-            final message = state.messages[state.messages.length - 1 - index];
+            final message = userMessages[userMessages.length - 1 - index];
             return _MessageBubble(message: message, user: user);
           },
         );
@@ -150,10 +153,78 @@ class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message, required this.user});
 
   void _showWordMeaning(BuildContext context, String word) {
+    // Clean the word - remove punctuation and convert to lowercase
+    final cleanWord = word.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
+    
+    if (cleanWord.isEmpty) return;
+    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => _WordMeaningSheet(word: word),
+      isScrollControlled: true,
+      builder: (context) => _WordMeaningSheet(word: cleanWord),
+    );
+  }
+
+  void _showWordSelectionDialog(BuildContext context) {
+    final words = message.text
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .toList();
+
+    if (words.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'Select a word',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: words.map((word) {
+              final cleanWord = word.replaceAll(RegExp(r'[^\w\s]'), '');
+              return InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                  _showWordMeaning(context, cleanWord);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Text(
+                    cleanWord,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.green,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -192,12 +263,7 @@ class _MessageBubble extends StatelessWidget {
             ],
             Flexible(
               child: GestureDetector(
-                onLongPress: () {
-                  final words = message.text.split(' ');
-                  if (words.isNotEmpty) {
-                    _showWordMeaning(context, words.first);
-                  }
-                },
+                onLongPress: () => _showWordSelectionDialog(context),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -222,7 +288,7 @@ class _MessageBubble extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SelectableText(
+                      Text(
                         message.text,
                         style: TextStyle(
                           fontSize: 15,
@@ -231,14 +297,27 @@ class _MessageBubble extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        _formatTime(message.timestamp),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isSender
-                              ? Colors.white.withOpacity(0.7)
-                              : Colors.grey.shade600,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formatTime(message.timestamp),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isSender
+                                  ? Colors.white.withOpacity(0.7)
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.touch_app,
+                            size: 11,
+                            color: isSender
+                                ? Colors.white.withOpacity(0.5)
+                                : Colors.grey.shade400,
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -285,128 +364,346 @@ class _WordMeaningSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: FutureBuilder<Map<String, dynamic>>(
-        future: context.read<ChatCubit>().fetchWordMeaning(word),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SizedBox(
-              height: 200,
-              child: Center(
-                child: CircularProgressIndicator(color: Colors.green),
-              ),
-            );
-          }
-
-          if (snapshot.hasError || !snapshot.hasData) {
-            return SizedBox(
-              height: 200,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Could not find meaning for "$word"',
-                    style: const TextStyle(fontSize: 16),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final data = snapshot.data!;
-          final meanings = data['meanings'] as List? ?? [];
-
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        word.toLowerCase(),
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: FutureBuilder<Map<String, dynamic>>(
+            future: context.read<ChatCubit>().fetchWordMeaning(word),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return  Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: Colors.green),
+                      SizedBox(height: 16),
+                      Text(
+                        'Looking up word...',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
                         ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                if (data['phonetic'] != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    data['phonetic'],
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade600,
-                      fontStyle: FontStyle.italic,
-                    ),
+                    ],
                   ),
-                ],
-                const SizedBox(height: 20),
-                ...meanings.map((meaning) {
-                  final partOfSpeech = meaning['partOfSpeech'] ?? '';
-                  final definitions = meaning['definitions'] as List? ?? [];
+                );
+              }
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
+              if (snapshot.hasError || !snapshot.hasData) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        const Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
                         Text(
-                          partOfSpeech,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green,
+                          'Could not find meaning for',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade600,
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ...definitions.take(2).map((def) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('• ', style: TextStyle(fontSize: 16)),
-                                Expanded(
-                                  child: Text(
-                                    def['definition'] ?? '',
-                                    style: const TextStyle(fontSize: 15),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
+                        Text(
+                          '"$word"',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                          label: const Text('Close'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
                       ],
                     ),
-                  );
-                }).toList(),
-              ],
-            ),
-          );
-        },
-      ),
+                  ),
+                );
+              }
+
+              final data = snapshot.data!;
+              final meanings = data['meanings'] as List? ?? [];
+              final phonetics = data['phonetics'] as List? ?? [];
+              
+              // Find audio if available
+              String? audioUrl;
+              for (var phonetic in phonetics) {
+                if (phonetic['audio'] != null && 
+                    (phonetic['audio'] as String).isNotEmpty) {
+                  audioUrl = phonetic['audio'];
+                  break;
+                }
+              }
+
+              return SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Drag handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    
+                    // Word and close button
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                word.toLowerCase(),
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              if (data['phonetic'] != null) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Text(
+                                      data['phonetic'],
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey.shade600,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                    if (audioUrl != null) ...[
+                                      const SizedBox(width: 8),
+                                      Icon(
+                                        Icons.volume_up,
+                                        size: 16,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                          color: Colors.grey.shade600,
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Meanings
+                    ...meanings.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final meaning = entry.value;
+                      final partOfSpeech = meaning['partOfSpeech'] ?? '';
+                      final definitions = meaning['definitions'] as List? ?? [];
+                      final synonyms = meaning['synonyms'] as List? ?? [];
+                      final antonyms = meaning['antonyms'] as List? ?? [];
+
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          bottom: index == meanings.length - 1 ? 0 : 24,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Part of speech
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                partOfSpeech,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ),
+                            
+                            const SizedBox(height: 12),
+                            
+                            // Definitions
+                            ...definitions.asMap().entries.map((defEntry) {
+                              final defIndex = defEntry.key;
+                              final def = defEntry.value;
+                              final definition = def['definition'] ?? '';
+                              final example = def['example'];
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${defIndex + 1}. ',
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.green,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Text(
+                                            definition,
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              height: 1.5,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (example != null) ...[
+                                      const SizedBox(height: 6),
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 20),
+                                        child: Text(
+                                          '"$example"',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontStyle: FontStyle.italic,
+                                            color: Colors.grey.shade600,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            
+                            // Synonyms
+                            if (synonyms.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  Text(
+                                    'Synonyms: ',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                  ...synonyms.take(5).map((syn) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      syn,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.blue.shade700,
+                                      ),
+                                    ),
+                                  )).toList(),
+                                ],
+                              ),
+                            ],
+                            
+                            // Antonyms
+                            if (antonyms.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  Text(
+                                    'Antonyms: ',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                  ...antonyms.take(5).map((ant) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      ant,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.red.shade700,
+                                      ),
+                                    ),
+                                  )).toList(),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
 
-// THIS IS THE TEXT INPUT - IT WAS THERE BEFORE BUT HERE IT IS AGAIN
 class _MessageInput extends StatefulWidget {
   final UserModel user;
 
@@ -453,57 +750,57 @@ class _MessageInputState extends State<_MessageInput> {
         child: Row(
           children: [
             Expanded(
-child: Container(
-decoration: BoxDecoration(
-color: const Color(0xFFF4F5F7),
-borderRadius: BorderRadius.circular(24),
-),
-child: TextField(
-controller: _controller,
-
-maxLines: null,
-textCapitalization: TextCapitalization.sentences,
-decoration: const InputDecoration(
-hintText: 'Type a message...',
-border: InputBorder.none,
-contentPadding: EdgeInsets.symmetric(
-horizontal: 20,
-vertical: 12,
-),
-),
-// onSubmitted: () => _sendMessage(),
-),
-),
-),
-const SizedBox(width: 8),
-BlocBuilder<ChatCubit, ChatState>(
-builder: (context, state) {
-return Container(
-decoration: const BoxDecoration(
-color: Colors.green,
-shape: BoxShape.circle,
-),
-child: IconButton(
-icon: state.isLoading
-? const SizedBox(
-width: 20,
-height: 20,
-child: CircularProgressIndicator(
-strokeWidth: 2,
-valueColor:
-AlwaysStoppedAnimation<Color>(Colors.white),
-),
-)
-: const Icon(Icons.send_rounded),
-color: Colors.white,
-onPressed: state.isLoading ? null : _sendMessage,
-),
-);
-},
-),
-],
-),
-),
-);
-}
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F5F7),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  maxLines: null,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    hintText: 'Type a message...',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  onSubmitted: (_) => _sendMessage(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            BlocBuilder<ChatCubit, ChatState>(
+              builder: (context, state) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: state.isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Icon(Icons.send_rounded),
+                    color: Colors.white,
+                    onPressed: state.isLoading ? null : _sendMessage,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
