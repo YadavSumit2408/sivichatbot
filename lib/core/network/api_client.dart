@@ -1,7 +1,5 @@
-// lib/core/network/api_client.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'api_exception.dart';
 
 class ApiClient {
   final http.Client client;
@@ -12,17 +10,24 @@ class ApiClient {
     required this.baseUrl,
   });
 
-  // Performs a GET request and returns decoded JSON
-  Future<Map<String, dynamic>> get(String endpoint) async {
-    final response = await client.get(Uri.parse('$baseUrl$endpoint'));
+  Future<dynamic> get(String endpoint) async {
+    try {
+      final url = Uri.parse('$baseUrl$endpoint');
+      print('API Request: GET $url');
+      
+      final response = await client.get(url);
+      
+      print('API Response Status: ${response.statusCode}');
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        return decoded;
+      } else {
+        throw Exception('Failed to load data: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('API Client Error: $e');
+      rethrow;
     }
-
-    throw ApiException(
-      message: 'Request failed',
-      statusCode: response.statusCode,
-    );
   }
 }

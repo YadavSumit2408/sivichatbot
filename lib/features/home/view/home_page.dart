@@ -1,81 +1,136 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../cubit/home_cubit.dart';
-import '../cubit/home_state.dart';
 import '../../users/view/users_page.dart';
 import '../../chat/view/chat_history_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<HomeCubit, HomeState>(
-      builder: (context, state) {
-        final selectedTab = state.selectedTabIndex;
+  State<HomePage> createState() => _HomePageState();
+}
 
+class _HomePageState extends State<HomePage> {
+  final ScrollController _scrollController = ScrollController();
+  bool _showAppBar = true;
+  double _lastScrollOffset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final currentOffset = _scrollController.offset;
+
+    if (currentOffset > _lastScrollOffset && currentOffset > 50) {
+      if (_showAppBar) {
+        setState(() => _showAppBar = false);
+      }
+    } else if (currentOffset < _lastScrollOffset) {
+      if (!_showAppBar) {
+        setState(() => _showAppBar = true);
+      }
+    }
+
+    _lastScrollOffset = currentOffset;
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<HomeCubit, int>(
+      builder: (context, selectedTab) {
         return Scaffold(
-            body: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(32),
-            ),
-            child: NestedScrollView(
-              headerSliverBuilder: (_, __) => [
+          backgroundColor: const Color(0xFFF4F5F7),
+          body: NestedScrollView(
+            controller: _scrollController,
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
                 SliverAppBar(
-                  backgroundColor: Colors.white,
-                  elevation: 0,
                   floating: true,
                   snap: true,
-                  centerTitle: true,
-                  title: _TopTabSwitcher(selectedTab: selectedTab),
+                  pinned: false,
+                  backgroundColor: Colors.white,
+                  elevation: 0,
+                  toolbarHeight: 70,
+                  title: AnimatedOpacity(
+                    opacity: _showAppBar ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: _AppBarSwitcher(
+                      selectedIndex: selectedTab,
+                      onTabChanged: (index) {
+                        context.read<HomeCubit>().changeTab(index);
+                      },
+                    ),
+                  ),
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(1),
+                    child: Container(
+                      height: 1,
+                      color: Colors.grey.shade200,
+                    ),
+                  ),
                 ),
-              ],
-              body: IndexedStack(
-                index: selectedTab,
-                children: const [
-                  UsersPage(key: PageStorageKey('users')),
-                  ChatHistoryPage(key: PageStorageKey('history')),
-                ],
-              ),
-            ),
+              ];
+            },
+            body: _buildBody(selectedTab),
           ),
-        ));
+        );
       },
     );
   }
+
+  Widget _buildBody(int selectedTab) {
+    switch (selectedTab) {
+      case 0:
+        return const UsersPage();
+      case 1:
+        return const ChatHistoryPage();
+      default:
+        return const UsersPage();
+    }
+  }
 }
 
-class _TopTabSwitcher extends StatelessWidget {
-  final int selectedTab;
+class _AppBarSwitcher extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onTabChanged;
 
-  const _TopTabSwitcher({
-    required this.selectedTab,
+  const _AppBarSwitcher({
+    required this.selectedIndex,
+    required this.onTabChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      height: 44,
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(32),
+        color: const Color(0xFFF4F5F7),
+        borderRadius: BorderRadius.circular(12),
       ),
+      padding: const EdgeInsets.all(4),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _TabButton(
+          _SwitcherTab(
             label: 'Users',
-            isSelected: selectedTab == 0,
-            onTap: () => context.read<HomeCubit>().changeTab(0),
+            isSelected: selectedIndex == 0,
+            onTap: () => onTabChanged(0),
           ),
-          _TabButton(
+          const SizedBox(width: 4),
+          _SwitcherTab(
             label: 'Chat History',
-            isSelected: selectedTab == 1,
-            onTap: () => context.read<HomeCubit>().changeTab(1),
+            isSelected: selectedIndex == 1,
+            onTap: () => onTabChanged(1),
           ),
         ],
       ),
@@ -83,12 +138,12 @@ class _TopTabSwitcher extends StatelessWidget {
   }
 }
 
-class _TabButton extends StatelessWidget {
+class _SwitcherTab extends StatelessWidget {
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _TabButton({
+  const _SwitcherTab({
     required this.label,
     required this.isSelected,
     required this.onTap,
@@ -100,23 +155,30 @@ class _TabButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 8,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
+            fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.black : Colors.grey,
-            fontSize: 14
+            color: isSelected ? Colors.green : Colors.grey.shade600,
           ),
         ),
       ),
     );
   }
 }
+

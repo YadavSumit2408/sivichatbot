@@ -20,11 +20,11 @@ List<BlocProvider> buildBlocProviders() {
     BlocProvider<HomeCubit>(
       create: (_) => HomeCubit(),
     ),
-    BlocProvider<UsersCubit>(
-      create: (_) => UsersCubit(),
-    ),
     BlocProvider<ChatCubit>(
       create: (_) => ChatCubit(repository: chatRepository),
+    ),
+    BlocProvider<UsersCubit>(
+      create: (_) => UsersCubit(),
     ),
   ];
 }
